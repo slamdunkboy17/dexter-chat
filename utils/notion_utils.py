@@ -60,7 +60,7 @@ def get_client_properties_from_notion(slug):
 
 
 def fetch_all_clients():
-    """Fetches all clients (name + slug) from Notion for fuzzy slug matching."""
+    """Pulls all client names and slugs from Notion for use in fuzzy/broad match."""
     url = f"https://api.notion.com/v1/databases/{NOTION_DB_ID}/query"
     
     all_clients = []
@@ -73,23 +73,28 @@ def fetch_all_clients():
             payload["start_cursor"] = next_cursor
 
         response = requests.post(url, headers=HEADERS, json=payload)
-
         if response.status_code != 200:
             print("⚠️ Failed to fetch clients:", response.status_code, response.text)
             return []
 
         data = response.json()
-        results = data.get("results", [])
-
-        for result in results:
+        for result in data.get("results", []):
             try:
-                name = result["properties"]["Name"]["title"][0]["plain_text"].strip().lower()
-                slug = result["properties"]["Slug"]["rich_text"][0]["plain_text"].strip().lower()
-                all_clients.append({"name": name, "slug": slug})
+                name_obj = result["properties"].get("Name", {}).get("title", [])
+                slug_obj = result["properties"].get("Slug", {}).get("rich_text", [])
+
+                name = name_obj[0]["plain_text"].lower() if name_obj else None
+                slug = slug_obj[0]["plain_text"].lower() if slug_obj else None
+
+                if name and slug:
+                    all_clients.append({"name": name, "slug": slug})
+                else:
+                    print(f"⚠️ Missing name or slug in result: {result['id']}")
             except Exception as e:
-                print("⚠️ Skipping malformed entry:", e)
+                print(f"⚠️ Skipping malformed entry: {e}")
 
         has_more = data.get("has_more", False)
         next_cursor = data.get("next_cursor", None)
 
+    print(f"✅ Loaded {len(all_clients)} clients from Notion.")
     return all_clients

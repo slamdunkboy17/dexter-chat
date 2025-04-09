@@ -82,6 +82,8 @@ def run_pipeline(user_question: str, user_id: str = None) -> str:
     External entry point to run the pipeline with dynamic slug detection and fallback support.
     """
     slug = match_slug_from_text(user_question)
+    print(f"🔍 Matched slug from text: {slug}")
+
 
     if not slug and user_id:
         slug = RECENT_SLUGS.get(user_id)

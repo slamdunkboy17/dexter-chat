@@ -60,9 +60,8 @@ def get_client_properties_from_notion(slug):
 
 
 def fetch_all_clients():
-    """Pulls all client names and slugs from Notion for use in fuzzy/broad match."""
     url = f"https://api.notion.com/v1/databases/{NOTION_DB_ID}/query"
-    
+
     all_clients = []
     has_more = True
     next_cursor = None
@@ -79,25 +78,25 @@ def fetch_all_clients():
 
         data = response.json()
         for result in data.get("results", []):
-            props = result.get("properties", {})
-            name_field = props.get("Name")
-            slug_field = props.get("Slug")
+            try:
+                props = result["properties"]
+                name_raw = props.get("Client", {}).get("title", [])
+                slug_raw = props.get("Slug", {}).get("rich_text", [])
 
-            # Defensive: check presence and type
-            if not name_field or name_field["type"] != "title" or not name_field["title"]:
-                print(f"⚠️ Missing or invalid Name in result: {result.get('id')}")
-                continue
-            if not slug_field or slug_field["type"] != "rich_text" or not slug_field["rich_text"]:
-                print(f"⚠️ Missing or invalid Slug in result: {result.get('id')}")
-                continue
+                name = name_raw[0]["plain_text"].strip() if name_raw else None
+                slug = slug_raw[0]["plain_text"].strip() if slug_raw else None
 
-            name = name_field["title"][0]["plain_text"].strip().lower()
-            slug = slug_field["rich_text"][0]["plain_text"].strip().lower()
+                if not name or not slug:
+                    print(f"⚠️ Missing or invalid Name/Slug in result: {result['id']}")
+                    continue
 
-            all_clients.append({"name": name, "slug": slug})
+                all_clients.append({"name": name.lower(), "slug": slug.lower()})
+
+            except Exception as e:
+                print("⚠️ Error parsing Notion client row:", e)
 
         has_more = data.get("has_more", False)
-        next_cursor = data.get("next_cursor")
+        next_cursor = data.get("next_cursor", None)
 
     print(f"✅ Loaded {len(all_clients)} clients from Notion.")
     print("Clients:", all_clients)

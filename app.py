@@ -7,7 +7,7 @@ from slack_bolt.adapter.flask import SlackRequestHandler
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# 👉 Pull in your internal analysis logic
+# 👉 Import internal analysis pipeline
 from engine.pipeline import run_pipeline
 
 # Load environment variables
@@ -24,13 +24,14 @@ slack_app = App(
 flask_app = Flask(__name__)
 handler = SlackRequestHandler(slack_app)
 
-# GPT-4 response logic
+
+# 💡 GPT-4 response generator with internal pipeline context
 def generate_response(user_prompt):
     try:
-        # Always try running pipeline, even if it returns empty
+        # Always pull context from internal pipeline (even if minimal)
         context = run_pipeline(user_prompt)
 
-        # Combine prompt + context for a richer reply, even if context is light
+        # Merge prompt + internal analysis (fallback if no data found)
         full_prompt = (
             f"User question: {user_prompt}\n\n"
             f"Internal context:\n{context if context else '[No specific data found, use trends and analysis]'}"
@@ -59,7 +60,8 @@ def generate_response(user_prompt):
     except Exception as e:
         return f"⚠️ Error generating response: {str(e)}"
 
-# Respond to DMs
+
+# 📩 Respond to Slack DMs
 @slack_app.event("message")
 def handle_message(event, say):
     channel_type = event.get("channel_type")
@@ -69,17 +71,20 @@ def handle_message(event, say):
         gpt_response = generate_response(text)
         say(gpt_response)
 
-# Handle Slack challenge + events
+
+# 🌐 Slack Event Adapter
 @flask_app.route("/slack/events", methods=["POST"])
 def slack_events():
     payload = request.get_json()
 
+    # Handle Slack's verification challenge
     if payload.get("type") == "url_verification":
         return jsonify({"challenge": payload["challenge"]})
 
     return handler.handle(request)
 
-# Run Flask app
+
+# 🚀 Run the Flask app
 if __name__ == "__main__":
     print("✅ Flask server running at http://localhost:3000")
     port = int(os.environ.get("PORT", 3000))

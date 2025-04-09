@@ -1,29 +1,53 @@
 # File: engine/pipeline.py
 
 from . import nlu, retrieve, math, trends, strategy, pr, polish
+from utils.notion_utils import fetch_all_clients
+import re
 
-def analyze_for_question(slug: str, user_question: str) -> str:
-    """
-    Orchestrates Dexter's multi-layer intelligence pipeline to respond to a user question.
-    """
+# Global cache of known clients
+KNOWN_CLIENTS = fetch_all_clients()  # Returns list of {"name": ..., "slug": ...}
+RECENT_SLUGS = {}  # user_id -> last used slug
 
+def match_slug_from_text(text):
+    """
+    Attempt to find a client slug by matching their name or slug in the question.
+    """
+    text = text.lower()
+    for client in KNOWN_CLIENTS:
+        name = client["name"]
+        slug = client["slug"]
+        if name in text or slug in text:
+            return slug
+    return None
+
+def analyze_for_question(slug: str, user_question: str, fallback: bool = False, user_id: str = None) -> str:
+    """
+    Main pipeline executor. If fallback=True, skips data and only uses trends and strategy.
+    """
     print("🧠 Starting NLU layer...")
     question_context = nlu.parse(user_question, slug)
+    if user_id:
+        question_context["user_id"] = user_id
     print("📎 NLU Output:", question_context)
 
-    print("📥 Retrieving data...")
-    raw_data = retrieve.collect(slug)
-    print("📊 Raw data retrieved for", slug)
-    print("📎 Industry:", raw_data.get('industry'))
-    print("📎 Benchmark CPL:", raw_data.get('benchmark_cpl'))
-    print("📎 Ads rows:", len(raw_data.get("ads_df", [])))
-    print("📎 GA rows:", len(raw_data.get("ga_df", [])))
+    metrics = {}
+    raw_data = {}
 
-    print("🧮 Calculating performance metrics...")
-    metrics = math.calculate(raw_data)
+    if not fallback:
+        print("📥 Retrieving data...")
+        raw_data = retrieve.collect(slug)
+        print("📊 Raw data retrieved for", slug)
+        print("📎 Industry:", raw_data.get('industry'))
+        print("📎 Benchmark CPL:", raw_data.get('benchmark_cpl'))
+        print("📎 Ads rows:", len(raw_data.get("ads_df", [])))
+        print("📎 GA rows:", len(raw_data.get("ga_df", [])))
+
+        print("🧮 Calculating performance metrics...")
+        metrics = math.calculate(raw_data)
 
     print("🌐 Gathering market trends...")
-    industry_trends = trends.get_trends(raw_data["industry"])
+    industry = raw_data.get("industry", "general marketing")
+    industry_trends = trends.get_trends(industry)
 
     print("🧠 Generating strategic insight...")
     strategic_thought = strategy.generate(metrics, industry_trends, question_context)
@@ -37,23 +61,22 @@ def analyze_for_question(slug: str, user_question: str) -> str:
     print("✅ Pipeline complete.")
     return final_message
 
-def run_pipeline(user_question: str) -> str:
+def run_pipeline(user_question: str, user_id: str = None) -> str:
     """
-    Default external pipeline interface that uses keyword matching to determine the client slug.
+    External entry point to run the pipeline with dynamic slug detection and fallback support.
     """
+    slug = match_slug_from_text(user_question)
 
-    # 🔍 You can replace this with a more sophisticated slug detection if needed
-    slug_map = {
-        "hp roofing": "hp-roofing",
-        "weathercheck": "weathercheck",
-        "valor": "valor-exterior-partners",
-    }
+    if not slug and user_id:
+        slug = RECENT_SLUGS.get(user_id)
 
-    lower_q = user_question.lower()
-    slug = next((slug for key, slug in slug_map.items() if key in lower_q), None)
+    fallback_mode = False
 
-    if not slug:
-        print("❗️No known client found in question. Skipping data-driven response.")
-        return ""
+    if slug:
+        if user_id:
+            RECENT_SLUGS[user_id] = slug
+    else:
+        fallback_mode = True
+        slug = "general"  # Not used to fetch data, just passed to NLU
 
-    return analyze_for_question(slug, user_question)
+    return analyze_for_question(slug, user_question, fallback=fallback_mode, user_id=user_id)

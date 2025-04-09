@@ -26,11 +26,27 @@ def generate_response(prompt):
     try:
         response = client.chat.completions.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Dexter, an AI growth assistant created by Winning Creative. "
+                        "You're analytical, strategic, and speak confidently about marketing data. "
+                        "You have access to internal reports, performance summaries, and trend analysis for clients like HP Roofing. "
+                        "If a user asks about a client, assume you’re offering insight based on internal campaign performance, "
+                        "not external sources. Be helpful, direct, and clear."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"⚠️ Error generating response: {str(e)}"
+
 
 # Respond to DMs
 @slack_app.event("message")

@@ -8,16 +8,19 @@ import re
 KNOWN_CLIENTS = fetch_all_clients()  # Returns list of {"name": ..., "slug": ...}
 RECENT_SLUGS = {}  # user_id -> last used slug
 
-def match_slug_from_text(text):
-    """
-    Attempt to find a client slug by matching their name or slug in the question.
-    """
-    text = text.lower()
+def normalize_string(s: str) -> str:
+    # Remove any non-alphanumeric characters and convert to lowercase.
+    return re.sub(r'\W+', '', s.lower())
+
+def match_slug_from_text(text: str) -> str:
+    norm_text = normalize_string(text)
     for client in KNOWN_CLIENTS:
-        name = client["name"]
-        slug = client["slug"]
-        if name in text or slug in text:
-            return slug
+        norm_name = normalize_string(client["name"])
+        norm_slug = normalize_string(client["slug"])
+        # Check if either the normalized name or slug is in the normalized text.
+        if norm_name in norm_text or norm_slug in norm_text:
+            print(f"🔎 Matched client '{client['name']}' (slug: {client['slug']}) with input '{text}'")
+            return client["slug"]
     return None
 
 def analyze_for_question(slug: str, user_question: str, fallback: bool = False, user_id: str = None) -> str:

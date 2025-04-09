@@ -22,7 +22,8 @@ def match_slug_from_text(text):
 
 def analyze_for_question(slug: str, user_question: str, fallback: bool = False, user_id: str = None) -> str:
     """
-    Main pipeline executor. If fallback=True, skips data and only uses trends and strategy.
+    Main pipeline executor. If fallback=True, skips data retrieval and math,
+    but still uses trends + strategy layers.
     """
     print("🧠 Starting NLU layer...")
     question_context = nlu.parse(user_question, slug)
@@ -44,6 +45,17 @@ def analyze_for_question(slug: str, user_question: str, fallback: bool = False, 
 
         print("🧮 Calculating performance metrics...")
         metrics = math.calculate(raw_data)
+    else:
+        # Safe defaults to avoid KeyErrors for references like lead_change/user_change
+        metrics = {
+            "total_cost": None,
+            "total_conversions": None,
+            "conversion_rate": None,
+            "cpl": None,
+            "benchmark_cpl": None,
+            "lead_change": None,
+            "user_change": None,
+        }
 
     print("🌐 Gathering market trends...")
     industry = raw_data.get("industry", "general marketing")
@@ -60,6 +72,7 @@ def analyze_for_question(slug: str, user_question: str, fallback: bool = False, 
 
     print("✅ Pipeline complete.")
     return final_message
+
 
 def run_pipeline(user_question: str, user_id: str = None) -> str:
     """

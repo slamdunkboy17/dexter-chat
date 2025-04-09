@@ -97,4 +97,5 @@ def fetch_all_clients():
         next_cursor = data.get("next_cursor", None)
 
     print(f"✅ Loaded {len(all_clients)} clients from Notion.")
+    print("Clients:", all_clients)
     return all_clients

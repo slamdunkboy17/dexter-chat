@@ -5,8 +5,15 @@ from utils.notion_utils import fetch_all_clients
 import re
 
 # Global cache of known clients
-KNOWN_CLIENTS = fetch_all_clients()  # Returns list of {"name": ..., "slug": ...}
+try:
+    KNOWN_CLIENTS = fetch_all_clients()  # Returns list of {"name": ..., "slug": ...}
+    print(f"✅ Loaded {len(KNOWN_CLIENTS)} clients from Notion.")
+except Exception as e:
+    print("❌ Error loading clients from Notion:", str(e))
+    KNOWN_CLIENTS = []
+
 RECENT_SLUGS = {}  # user_id -> last used slug
+
 
 def normalize_string(s: str) -> str:
     # Remove any non-alphanumeric characters and convert to lowercase.

@@ -62,7 +62,7 @@ def get_client_properties_from_notion(slug):
 def fetch_all_clients():
     """Pulls all client names and slugs from Notion for use in fuzzy/broad match."""
     url = f"https://api.notion.com/v1/databases/{NOTION_DB_ID}/query"
-
+    
     all_clients = []
     has_more = True
     next_cursor = None
@@ -83,18 +83,22 @@ def fetch_all_clients():
             name_field = props.get("Name")
             slug_field = props.get("Slug")
 
-            if not name_field or not slug_field:
-                print(f"⚠️ Missing name or slug in result: {result.get('id')}")
+            # Defensive: check presence and type
+            if not name_field or name_field["type"] != "title" or not name_field["title"]:
+                print(f"⚠️ Missing or invalid Name in result: {result.get('id')}")
+                continue
+            if not slug_field or slug_field["type"] != "rich_text" or not slug_field["rich_text"]:
+                print(f"⚠️ Missing or invalid Slug in result: {result.get('id')}")
                 continue
 
-            try:
-                name = name_field["title"][0]["plain_text"].lower()
-                slug = slug_field["rich_text"][0]["plain_text"].lower()
-                all_clients.append({"name": name, "slug": slug})
-            except (IndexError, KeyError, TypeError) as e:
-                print(f"⚠️ Skipping malformed entry {result.get('id')}: {e}")
+            name = name_field["title"][0]["plain_text"].strip().lower()
+            slug = slug_field["rich_text"][0]["plain_text"].strip().lower()
+
+            all_clients.append({"name": name, "slug": slug})
 
         has_more = data.get("has_more", False)
-        next_cursor = data.get("next_cursor", None)
+        next_cursor = data.get("next_cursor")
 
+    print(f"✅ Loaded {len(all_clients)} clients from Notion.")
+    print("Clients:", all_clients)
     return all_clients
